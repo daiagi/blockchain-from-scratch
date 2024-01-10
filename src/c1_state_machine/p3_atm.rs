@@ -2,6 +2,7 @@
 //! The atm may fail to give you cash if it is empty or you haven't swiped your card, or you have
 //! entered the wrong pin.
 
+use crate::c1_state_machine::p3_atm::Auth::Waiting;
 use super::StateMachine;
 
 /// The keys on the ATM keypad
@@ -52,6 +53,27 @@ pub struct Atm {
 	keystroke_register: Vec<Key>,
 }
 
+impl Atm {
+	fn add_key_to_register(&self, key: &Key) -> Self {
+		let mut new_state = self.clone();
+		new_state.keystroke_register.push(key.clone());
+		new_state
+	}
+
+	fn reset_keystroke_register(&mut self) {
+		self.keystroke_register.clear();
+	}
+
+	fn is_correct_pin(&self, pin_hash: &u64) -> bool {
+		&crate::hash(&self.keystroke_register) == pin_hash
+	}
+
+	fn reset_expected_pin_hash(&mut self) {
+		self.expected_pin_hash = Auth::Waiting
+	}
+
+}
+
 impl StateMachine for Atm {
 	// Notice that we are using the same type for the state as we are using for the machine this
 	// time.
@@ -59,7 +81,73 @@ impl StateMachine for Atm {
 	type Transition = Action;
 
 	fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-		todo!("Exercise 4")
+		use Action::*;
+		let same_state = starting_state.clone();
+
+		match starting_state.expected_pin_hash {
+			Auth::Waiting => match t {
+				SwipeCard(code_hash) => Self {
+					expected_pin_hash: Auth::Authenticating(*code_hash),
+					..same_state
+				},
+				_ => same_state,
+			},
+			Auth::Authenticating(pin_hash) => match t {
+				PressKey(Key::Enter) => {
+					let pin_correct = starting_state.is_correct_pin(&pin_hash);
+					let mut new_state = same_state;
+					new_state.reset_keystroke_register();
+					new_state.reset_expected_pin_hash();
+					if pin_correct {
+						new_state.expected_pin_hash = Auth::Authenticated;
+					}
+					new_state
+				},
+				PressKey(key) => starting_state.add_key_to_register(key),
+				_ => same_state
+			},
+			Auth::Authenticated => match t {
+				PressKey(Key::Enter) => {
+					let mut new_state = same_state;
+					let amount_to_withdraw = <u64 as FromKeyVec>::from(&new_state.keystroke_register);
+					let update_cash = if (amount_to_withdraw > starting_state.cash_inside) {
+						starting_state.cash_inside
+					} else {
+						starting_state.cash_inside - amount_to_withdraw
+					};
+					new_state.cash_inside = update_cash;
+					new_state.reset_keystroke_register();
+					new_state.reset_expected_pin_hash();
+					new_state
+				}
+				PressKey(key) => starting_state.add_key_to_register(key),
+				_ => same_state
+
+				},
+
+			}
+
+	}
+}
+
+trait FromKeyVec {
+	fn from(keys: &Vec<Key>) -> u64;
+}
+
+impl FromKeyVec for  u64 {
+	fn from(keys: &Vec<Key>) -> u64 {
+		fn map(k: &Key) -> &str {
+			use Key::*;
+			match k {
+				One => "1",
+				Two => "2",
+				Three => "3",
+				Four => "4",
+				_ => ""
+			}
+		}
+		let num_string: String = keys.iter().map(|k| map(k)).collect();
+		num_string.parse::<u64>().unwrap_or(0)
 	}
 }
 

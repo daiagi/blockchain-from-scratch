@@ -41,7 +41,63 @@ impl StateMachine for AccountedCurrency {
 	type Transition = AccountingTransaction;
 
 	fn next_state(starting_state: &Balances, t: &AccountingTransaction) -> Balances {
-		todo!("Exercise 1")
+		use AccountingTransaction::*;
+		let mut balances = starting_state.clone();
+
+		match t {
+			Mint{minter, amount: minted_amount} => {
+				if minted_amount == &0u64 {
+					return balances
+				}
+				balances.entry(*minter)
+					.and_modify(|mut amount| {
+						*amount = amount.saturating_add(*minted_amount);
+						}
+					)
+					.or_insert(*minted_amount);
+				balances
+
+			},
+			Burn{burner, amount: amount_to_burn} => {
+				if !starting_state.contains_key(burner) {
+					return  balances
+				}
+				balances.entry(*burner)
+					.and_modify(|mut amount| {
+						*amount = amount.saturating_sub(*amount_to_burn);
+					}
+					);
+				if balances.get(burner).unwrap() == &0u64 {
+					balances.remove(burner);
+				}
+				balances
+
+			}
+			Transfer {sender,receiver,amount} => {
+				let sender_balance = balances.get(sender);
+				if *amount == 0 {
+					return  balances;
+				}
+				match sender_balance {
+					None => return balances,
+					Some(balance) if balance.checked_sub(*amount).is_none() => return balances,
+					_ => ()
+				}
+
+				balances.entry(*receiver)
+					.and_modify(|mut receiver_balance| {
+					*receiver_balance = receiver_balance.saturating_add(*amount)
+					})
+					.or_insert(*amount);
+				balances.entry(*sender).and_modify(|mut sender_balance| {
+					*sender_balance = sender_balance.saturating_sub(*amount)
+				});
+				if *balances.get(sender).unwrap() == 0 {
+					balances.remove(sender);
+				}
+				balances
+			}
+		}
 	}
 }
 

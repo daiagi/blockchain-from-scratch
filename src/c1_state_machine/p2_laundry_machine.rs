@@ -2,6 +2,7 @@
 //! they're ready to be worn again. Or course washing and wearing clothes takes its toll on the
 //! clothes, and eventually they get tattered.
 
+use std::mem::uninitialized;
 use super::StateMachine;
 
 /// This state machine models the typical life cycle of clothes as they make their way through the
@@ -40,7 +41,45 @@ impl StateMachine for ClothesMachine {
 	type Transition = ClothesAction;
 
 	fn next_state(starting_state: &ClothesState, t: &ClothesAction) -> ClothesState {
-		todo!("Exercise 3")
+		let next_life_time = match *starting_state {
+			ClothesState::Dirty(life) => Some(life -1),
+			ClothesState::Clean(life) => Some(life -1),
+			ClothesState::Wet(life) => Some(life -1),
+			ClothesState::Tattered => None
+
+		};
+		let next_life_time = match next_life_time {
+			Some(n) if n == 0 => None,
+			_ => next_life_time
+		};
+		match t {
+			&ClothesAction::Wear => {
+				match next_life_time {
+					Some(t) => ClothesState::Dirty(t),
+					None => ClothesState::Tattered
+				}
+
+			},
+			&ClothesAction::Wash => {
+				match next_life_time { 
+					Some(t) => ClothesState::Wet(t),
+					None => ClothesState::Tattered
+				}
+			}
+			&ClothesAction::Dry => {
+				match next_life_time {
+					None => ClothesState::Tattered,
+					Some(n) => {
+						match *starting_state {
+							ClothesState::Wet(_) => ClothesState::Clean(n),
+							ClothesState::Tattered => ClothesState::Tattered,
+							ClothesState::Clean(_) => ClothesState::Clean(n),
+							ClothesState::Dirty(_) => ClothesState::Dirty(n)
+						}
+					}
+				}
+			}
+		}
 	}
 }
 

@@ -2,6 +2,7 @@
 //! structure. We learned from the lecture that it is actually the headers that are hash linked, so
 //! let's start with that.
 
+use std::fmt::Debug;
 use crate::hash;
 
 // We will use Rust's built-in hashing where the output type is u64. I'll make an alias
@@ -19,17 +20,37 @@ pub struct Header {
 	consensus_digest: (),
 }
 
+impl Default for Header {
+	fn default() -> Self {
+		Self {
+			state_root: (),
+			consensus_digest: (),
+			extrinsics_root: (),
+			height: 0,
+			parent: 0
+		}
+	}
+
+}
+
 // Here are the methods for creating a new header and verifying headers.
 // It is your job to write them.
 impl Header {
 	/// Returns a new valid genesis header.
 	fn genesis() -> Self {
-		todo!("Exercise 1")
+
+		Self::default()
 	}
 
 	/// Create and return a valid child header.
 	fn child(&self) -> Self {
-		todo!("Exercise 2")
+
+		Self {
+			parent: hash(&self),
+			height: self.height.saturating_add(1),
+			..self.clone()
+
+		}
 	}
 
 	/// Verify that all the given headers form a valid chain from this header to the tip.
@@ -37,7 +58,17 @@ impl Header {
 	/// This method may assume that the block on which it is called is valid, but it
 	/// must verify all of the blocks in the slice;
 	fn verify_sub_chain(&self, chain: &[Header]) -> bool {
-		todo!("Exercise 3")
+
+		let mut parent = self;
+
+		for this_block in chain {
+			if this_block.parent != hash(parent)
+			|| this_block.height - parent.height != 1 {
+				return false
+			}
+			parent = this_block;
+		}
+		true
 	}
 }
 
@@ -45,14 +76,23 @@ impl Header {
 
 /// Build and return a valid chain with exactly five blocks including the genesis block.
 fn build_valid_chain_length_5() -> Vec<Header> {
-	todo!("Exercise 4")
+	let gen = Header::genesis();
+	let mut chain = vec![gen];
+	for i in 0..4 {
+		chain.push(chain.get(i).unwrap().child())
+	}
+	chain
 }
 
 /// Build and return a chain with at least three headers.
 /// The chain should start with a proper genesis header,
 /// but the entire chain should NOT be valid.
 fn build_an_invalid_chain() -> Vec<Header> {
-	todo!("Exercise 5")
+	let genesis = Header::genesis();
+	let c1 =genesis.child();
+	let c2 = c1.child();
+	vec![genesis,c2,c1]
+
 }
 
 // To run these tests: `cargo test bc_1

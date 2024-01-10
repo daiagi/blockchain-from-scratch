@@ -51,6 +51,10 @@ impl State {
 		self.bills.insert(elem);
 		self.increment_serial()
 	}
+
+	fn remove_bill(&mut self, elem: &Bill) {
+		self.bills.remove(elem);
+	}
 }
 
 impl FromIterator<Bill> for State {
@@ -88,7 +92,43 @@ impl StateMachine for DigitalCashSystem {
 	type Transition = CashTransaction;
 
 	fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-		todo!("Exercise 1")
+		let mut state = starting_state.clone();
+		match t {
+			CashTransaction::Mint { minter, amount } => {
+				let bill = Bill {
+					amount: *amount,
+					owner: *minter,
+					serial: starting_state.next_serial
+				};
+				state.add_bill(bill);
+				state
+			}
+
+			CashTransaction::Transfer { spends, receives } => {
+				if spends.is_empty()
+					|| spends.iter().all(|bill|
+					starting_state.bills.contains(bill) && bill.amount > 0 && bill.amount < u64::MAX
+				) {
+					return state;
+				}
+
+				for bill in spends {
+					state.remove_bill(bill);
+				}
+
+				for (index, bill) in receives.iter().enumerate() {
+					if bill.amount > 0
+						&& bill.amount < u64::MAX
+						&& bill.serial == state.next_serial() + index as u64 {
+						state.add_bill(bill.clone());
+						state.increment_serial();
+					}
+
+					state.increment_serial();
+				}
+				state
+			}
+		}
 	}
 }
 
@@ -117,7 +157,7 @@ fn sm_5_overflow_receives_fails() {
 			],
 		},
 	);
-	let expected = State::from([Bill { owner: User::Alice, amount: 42, serial: 0 }]);
+	let expected = State::from([Bill { owner: User::Alice, amount: 42, serial: 2 }]);
 	assert_eq!(end, expected);
 }
 

@@ -14,7 +14,7 @@ type Hash = u64;
 /// In this lesson we are introducing proof of work onto our blocks. We need a hash threshold.
 /// You may change this as you see fit, and I encourage you to experiment. Probably best to start
 /// high so we aren't wasting time mining. I'll start with 1 in 100 blocks being valid.
-const THRESHOLD: u64 = u64::max_value() / 100;
+pub(crate) const THRESHOLD: u64 = u64::max_value() / 100;
 
 /// In this lesson we introduce the concept of a contentious hard fork. The fork will happen at
 /// this block height.
@@ -24,7 +24,7 @@ const FORK_HEIGHT: u64 = 2;
 /// For Proof of Work, the consensus digest is basically just a nonce which gets the block
 /// hash below a certain threshold. Although we could call the field `nonce` we will leave
 /// the more general `digest` term. For PoA we would have a cryptographic signature in this field.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Header {
 	parent: Hash,
 	height: u64,
@@ -38,12 +38,27 @@ pub struct Header {
 impl Header {
 	/// Returns a new valid genesis header.
 	fn genesis() -> Self {
-		todo!("Exercise 1")
+		Header::default()
 	}
 
 	/// Create and return a valid child header.
 	fn child(&self, extrinsic: u64) -> Self {
-		todo!("Exercise 2")
+
+		for nonce in 0..u64::MAX {
+			let header = Header {
+				parent: hash(self),
+				extrinsic,
+				state: self.state + extrinsic,
+				height: self.height + 1,
+				consensus_digest: nonce
+			};
+			if hash(&header) < THRESHOLD {
+				return header
+			}
+		}
+		panic!("Could not mint child")
+
+
 	}
 
 	/// Verify that all the given headers form a valid chain from this header to the tip.
@@ -51,7 +66,22 @@ impl Header {
 	/// In addition to all the rules we had before, we now need to check that the block hash
 	/// is below a specific threshold.
 	fn verify_sub_chain(&self, chain: &[Header]) -> bool {
-		todo!("Exercise 3")
+		let mut previous_block = self;
+		for current_block in chain {
+			let does_hash_match = current_block.parent == hash(previous_block);
+			let does_height_match = current_block.height == previous_block.height +1;
+			let does_state_match = current_block.state == previous_block.state + current_block.extrinsic;
+			let is_hash_below_thresh = hash(current_block) < THRESHOLD;
+
+			if     !is_hash_below_thresh
+				|| !does_hash_match
+				|| !does_height_match
+				|| !does_state_match {
+				return  false
+				}
+			previous_block = current_block
+		}
+		true
 	}
 
 	// After the blockchain ran for a while, a political rift formed in the community.
@@ -63,13 +93,32 @@ impl Header {
 	/// verify that the given headers form a valid chain.
 	/// In this case "valid" means that the STATE MUST BE EVEN.
 	fn verify_sub_chain_even(&self, chain: &[Header]) -> bool {
-		todo!("Exercise 4")
+		let all_states_are_even =  chain
+			.iter()
+			.skip(FORK_HEIGHT as usize)
+			.all(|header| header.state % 2 == 0);
+
+		if !all_states_are_even {
+			return false;
+		}
+
+		self.verify_sub_chain(chain)
+
 	}
 
 	/// verify that the given headers form a valid chain.
 	/// In this case "valid" means that the STATE MUST BE ODD.
 	fn verify_sub_chain_odd(&self, chain: &[Header]) -> bool {
-		todo!("Exercise 5")
+		let all_states_are_odd = chain
+			.iter()
+			.skip(FORK_HEIGHT as usize)
+			.all(|header| header.state % 2 == 1);
+
+		if !all_states_are_odd {
+			return false;
+		}
+
+		self.verify_sub_chain(chain)
 	}
 }
 
@@ -90,7 +139,18 @@ impl Header {
 /// G -- 1 -- 2
 ///            \-- 3'-- 4'
 fn build_contentious_forked_chain() -> (Vec<Header>, Vec<Header>, Vec<Header>) {
-	todo!("Exercise 6")
+	let gen = Header::genesis();
+	let first = gen.child(1);
+	let second = first.child(1);
+	let even_1 = second.child(2);
+	let even_2 = even_1.child(2);
+	let odd_1 = second.child(1);
+	let odd_2  = odd_1.child(2);
+
+	let common = vec![gen, first, second];
+	let even =  vec![even_1, even_2];
+	let odd = vec![odd_1, odd_2];
+	(common, even, odd)
 }
 
 // To run these tests: `cargo test bc_3`
