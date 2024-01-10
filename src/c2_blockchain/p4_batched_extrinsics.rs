@@ -122,10 +122,10 @@ impl Block {
 	///
 	/// We need to verify the headers as well as execute all transactions and check the final state.
 	pub fn verify_sub_chain(&self, chain: &[Block]) -> bool {
-		let header_chain: &[Header] = chain.iter()
-			.map(|block| block.header)
+		let header_chain: Vec<Header> = chain.iter()
+			.map(|block| block.header.clone())
 			.collect();
-		if !self.header.verify_sub_chain(header_chain)  {
+		if !self.header.verify_sub_chain(&header_chain)  {
 			return false
 		}
 
