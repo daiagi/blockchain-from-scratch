@@ -105,12 +105,23 @@ impl StateMachine for DigitalCashSystem {
 			}
 
 			CashTransaction::Transfer { spends, receives } => {
-				if spends.is_empty()
-					|| spends.iter().all(|bill|
-					starting_state.bills.contains(bill) && bill.amount > 0 && bill.amount < u64::MAX
-				) {
-					return state;
+
+				if spends.is_empty()  {
+					return state
 				}
+				 fn bill_is_bounded(bill: &Bill  )  -> bool {
+					 bill.amount > 0 && bill.amount < u64::MAX
+				 }
+				if spends.iter().any(|bill| !bill_is_bounded(bill))
+				 || receives.iter().any(|bill| !bill_is_bounded(bill)) {
+					return state
+				}
+				// if spends.is_empty()
+				// 	|| spends.iter().all(|bill|
+				// 	starting_state.bills.contains(bill) && bill.amount > 0 && bill.amount < u64::MAX
+				// ) {
+				// 	return state;
+				// }
 
 				for bill in spends {
 					state.remove_bill(bill);
