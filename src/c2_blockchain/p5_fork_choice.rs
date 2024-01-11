@@ -10,7 +10,7 @@
 use super::p4_batched_extrinsics::{Block, Header};
 use crate::hash;
 
-const THRESHOLD: u64 = u64::max_value() / 100;
+const THRESHOLD: u64 = u64::max_value() / 1000;
 
 /// Judge which blockchain is "best" when there are multiple candidates. There are several
 /// meaningful notions of "best" which is why this is a trait instead of just a
@@ -32,8 +32,16 @@ pub trait ForkChoice {
 	/// It is always possible to compare several chains if you are able to compare
 	/// two chains. Therefore this method has a provided implementation. However,
 	/// it may be much more performant to write a fork-choice-specific implementation.
-	fn best_chain<'a>(candidate_chains: &[&'a [Header]]) -> &'a [Header] {
-		todo!("Exercise 1")
+	fn best_chain<'a,>(candidate_chains: &[&'a [Header]]) -> &'a [Header] {
+		let mut best_chain = candidate_chains.get(0).unwrap();
+
+		for chain in candidate_chains.iter().skip(1) {
+			if Self::first_chain_is_better(chain, best_chain) {
+				best_chain = chain;
+			}
+		}
+
+		best_chain
 	}
 }
 
@@ -42,15 +50,9 @@ pub struct LongestChainRule;
 
 impl ForkChoice for LongestChainRule {
 	fn first_chain_is_better(chain_1: &[Header], chain_2: &[Header]) -> bool {
-		todo!("Exercise 1")
+		chain_1.len() > chain_2.len()
 	}
 
-	fn best_chain<'a>(candidate_chains: &[&'a [Header]]) -> &'a [Header] {
-		// Remember, this method is provided. You _can_ solve the exercise by
-		// simply deleting this block. It is up to you to decide whether this fork
-		// choice warrants a custom implementation.
-		todo!("Exercise 3")
-	}
 }
 
 /// The best chain is the one with the most accumulated work.
@@ -68,18 +70,23 @@ pub struct HeaviestChainRule;
 /// usage is that you create a block using the normal `Block.child()` method
 /// and then pass the block to this helper for additional mining.
 fn mine_extra_hard(block: &mut Block, threshold: u64) {
-	todo!("Exercise 4")
+
+	while hash(&block.header) >= threshold {
+		block.header.consensus_digest += 1;
+	}
 }
 
 impl ForkChoice for HeaviestChainRule {
 	fn first_chain_is_better(chain_1: &[Header], chain_2: &[Header]) -> bool {
-		todo!("Exercise 5")
+
+		let chain_1_weight: u64 = chain_1.iter().map(|h| hash(h)).sum();
+		let chain_2_weight: u64 = chain_2.iter().map(|h| hash(h)).sum();
+		chain_2_weight > chain_1_weight
+
+
 	}
 
-	fn best_chain<'a>(candidate_chains: &[&'a [Header]]) -> &'a [Header] {
-		// Remember, this method is provided.
-		todo!("Exercise 6")
-	}
+
 }
 /// The best chain is the one with the most blocks that have even hashes.
 ///
@@ -99,13 +106,19 @@ pub struct MostBlocksWithEvenHash;
 
 impl ForkChoice for MostBlocksWithEvenHash {
 	fn first_chain_is_better(chain_1: &[Header], chain_2: &[Header]) -> bool {
-		todo!("Exercise 7")
+
+		fn chain_even_count(chain: &[Header]) -> usize {
+			chain.iter()
+				.filter_map(|h|
+					match hash(h) {
+						hash if hash % 2 == 0 => Some(hash),
+						_ => None
+					})
+				.count()
+		}
+		chain_even_count(chain_1) > chain_even_count(chain_2)
 	}
 
-	fn best_chain<'a>(candidate_chains: &[&'a [Header]]) -> &'a [Header] {
-		// Remember, this method is provided.
-		todo!("Exercise 8")
-	}
 }
 
 // This lesson has omitted one popular fork choice rule:
@@ -131,7 +144,34 @@ impl ForkChoice for MostBlocksWithEvenHash {
 /// 2. The suffix chain which is longer (non-overlapping with the common prefix)
 /// 3. The suffix chain with more work (non-overlapping with the common prefix)
 fn create_fork_one_side_longer_other_side_heavier() -> (Vec<Header>, Vec<Header>, Vec<Header>) {
-	todo!("Exercise 9")
+
+
+	fn into_headers(blocks: Vec<Block>) -> Vec<Header> {
+		blocks.iter().map(|b| b.header).collect()
+	}
+	let gen = Block::genesis();
+	let a = gen.child(vec![1,2,3]);
+	let b = a.child(vec![4,5,6]);
+
+	// longer
+
+	let mut l1 = b.child(vec![7]);
+	let mut l2 = l1.child(vec![8]);
+	let l3 = l2.child(vec![9]);
+
+	let longer = into_headers(vec![l1.clone(),l2.clone(),l3]);
+
+	let extra_hard_threshold = THRESHOLD / 10;
+
+	mine_extra_hard(&mut l1, extra_hard_threshold);
+	mine_extra_hard(&mut l2, extra_hard_threshold);
+
+	let heavy =  into_headers(vec![l1,l2]);
+
+
+	let prefix = into_headers(vec![gen, a, b]);
+
+	(prefix, longer, heavy)
 }
 
 #[test]
