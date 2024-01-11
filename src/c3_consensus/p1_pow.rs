@@ -4,6 +4,7 @@
 //! This is the same logic we implemented previously. Here we re-implement it in the
 //! generic consensus framework that we will use throughout the rest of the chapter.
 
+use crate::hash;
 use super::{Consensus, Header};
 
 /// A Proof of Work consensus engine. This is the same consensus logic that we
@@ -19,13 +20,23 @@ impl Consensus for PoW {
 	/// Check that the provided header's hash is below the required threshold.
 	/// This does not rely on the parent digest at all.
 	fn validate(&self, _: &Self::Digest, header: &Header<Self::Digest>) -> bool {
-		todo!("Exercise 1")
+		hash(header) < self.threshold
 	}
 
 	/// Mine a new PoW seal for the partial header provided.
 	/// This does not rely on the parent digest at all.
 	fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
-		todo!("Exercise 2")
+
+		for nonce in 0..u64::MAX {
+			let potential_header = Header::<Self::Digest> {
+				consensus_digest: nonce,
+				..partial_header
+			};
+			if hash(&potential_header) < self.threshold {
+				return Some(potential_header)
+			}
+		}
+		 None
 	}
 }
 
@@ -33,5 +44,8 @@ impl Consensus for PoW {
 /// with randomly drawn nonces will be valid. That is: the threshold should be u64::max_value() /
 /// 100.
 pub fn moderate_difficulty_pow() -> impl Consensus {
-	todo!("Exercise 3")
+
+	PoW {
+		threshold: u64::MAX / 100
+	}
 }

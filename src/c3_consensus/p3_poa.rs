@@ -21,7 +21,8 @@ impl Consensus for SimplePoa {
 	type Digest = ConsensusAuthority;
 
 	fn validate(&self, parent_digest: &Self::Digest, header: &Header<Self::Digest>) -> bool {
-		todo!("Exercise 1")
+		 self.authorities.contains(&header.consensus_digest)
+			 && &header.consensus_digest != parent_digest
 	}
 
 	fn seal(

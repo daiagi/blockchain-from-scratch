@@ -20,11 +20,16 @@ impl Consensus for DictatorConsensus {
 
 	/// Check that the header is signed by the dictator
 	fn validate(&self, _: &Self::Digest, header: &Header<Self::Digest>) -> bool {
-		todo!("Exercise 1")
+		header.consensus_digest == self.dictator
 	}
 
 	/// Sign the given partial header by the dictator
 	fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
-		todo!("Exercise 2")
+		Some(
+			Header::<Self::Digest> {
+				consensus_digest: self.dictator,
+				..partial_header
+			}
+		)
 	}
 }
