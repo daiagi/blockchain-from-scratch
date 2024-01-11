@@ -7,7 +7,7 @@ type Hash = u64;
 /// The header no longer contains an extrinsic directly. Rather a vector of extrinsics will be
 /// stored in the block body. We are still storing the state in the header for now. This will change
 /// in an upcoming lesson as well.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Copy)]
 pub struct Header {
 	parent: Hash,
 	height: u64,
@@ -62,7 +62,7 @@ impl Header {
 	fn verify_child(&self, child: &Header) -> bool {
 
 		child.parent == hash(self)
-		&& child.parent - self.parent == 1
+		&& child.height - self.height == 1
 		// && child.state == self.state + child.extrinsics_root
 	}
 
@@ -75,9 +75,10 @@ impl Header {
 	///  - with tail recursion
 	fn verify_sub_chain(&self, chain: &[Header]) -> bool {
 
-		if chain.len() == 1  {
-			return self.verify_child(&chain[0])
+		if !self.verify_child(&chain[0]) {
+			return false;
 		}
+
 		chain[0].verify_sub_chain(&chain[1..])
 
 	}
@@ -122,17 +123,25 @@ impl Block {
 	///
 	/// We need to verify the headers as well as execute all transactions and check the final state.
 	pub fn verify_sub_chain(&self, chain: &[Block]) -> bool {
-		let header_chain: &[Header] = chain.iter()
-			.map(|block| block.header)
+		let header_chain: Vec<Header> = chain.iter()
+			.map(|block| block.header.clone())
 			.collect();
-		if !self.header.verify_sub_chain(header_chain)  {
+		if !self.header.verify_sub_chain(&header_chain)  {
 			return false
 		}
+		let mut prev_block = self;
 
 		for block in chain {
+			let state_diff = block.header.state - prev_block.header.state;
+			let extrinsic_sum = block.body.iter().sum();
+
+			if state_diff != extrinsic_sum {
+				return false
+			}
+
+			prev_block = block;
 
 		}
-
 
 			true
 	}
@@ -147,7 +156,11 @@ impl Block {
 ///
 /// Notice that you do not need the entire parent block to do this. You only need the header.
 fn build_invalid_child_block_with_valid_header(parent: &Header) -> Block {
-	todo!("Exercise 8")
+
+	Block {
+		header: parent.child(parent.extrinsics_root, parent.state),
+		body: vec![2048]
+	}
 }
 
 #[test]
