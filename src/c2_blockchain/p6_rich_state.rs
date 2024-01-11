@@ -130,10 +130,11 @@ impl Block {
 			state.sum += extrinsic;
 			state.product *= extrinsic;
 		}
+		let state_root = hash(state);
 
 		Block {
 			body: extrinsics,
-			header: self.header.child(extrinsics_root, hash(state))
+			header: self.header.child(extrinsics_root, state_root)
 		}
 	}
 
